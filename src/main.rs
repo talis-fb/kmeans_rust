@@ -1,127 +1,105 @@
+mod entities;
+mod kmeans;
+
 fn main() {
-    let data: Vec<Point> = Vec::from([
-        (1.0, 2.0),
-        (5.0, 8.0),
-        (1.0, 3.0),
-        (6.0, 9.0),
-        (2.0, 3.0),
-        (5.0, 1.00),
-        (1.0, 1.0),
-        (7.0, 8.0),
-    ])
-    .into_iter()
-    .map(Point::from)
-    .collect();
+    println!("nothing here.");
+}
 
-    const K: u8 = 2;
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
 
-    let mut clusters = Cluster::init(data.clone(), K);
+    use crate::kmeans::KmeansSerialBuilder;
 
-    loop {
-        clusters = assignPoints(data.clone(), clusters);
+    use super::*;
+    use entities::{Cluster, Point};
 
-        let new_centers: Vec<Point> = calculate_new_centers(&clusters);
-        let old_centers: Vec<Point> = clusters.iter().map(|cluster| cluster.center.clone()).collect();
+    #[test]
+    fn test_kmeans_two_points() {
+        let data = [Point::from((1, 2)), Point::from((5, 8))];
+        let k = 2;
 
-        if converged(&new_centers, &old_centers) {
-            break;
-        }
+        let clusters_output = KmeansSerialBuilder::default()
+            .with_data(data.clone())
+            .with_k(k)
+            .with_initial_centers(data.into_iter().take(k as usize))
+            .execute();
 
-        for (i, cluster) in clusters.iter_mut().enumerate() {
-            cluster.center = new_centers.get(i).unwrap().clone();
-        }
+        let clusters_output_set: HashSet<Cluster> = HashSet::from_iter(clusters_output.clone());
+
+        assert_eq!(clusters_output.len(), k as usize);
+
+        let expected_set = HashSet::from_iter([
+            Cluster {
+                center: Point::from((1, 2)),
+                points: vec![Point::from((1, 2))],
+            },
+            Cluster {
+                center: Point::from((5, 8)),
+                points: vec![Point::from((5, 8))],
+            },
+        ]);
+
+        assert_eq!(expected_set, clusters_output_set);
     }
 
-    for cluster in clusters {
-        println!("{:?}", cluster);
+    #[test]
+    fn test_kmeans_few_points() {
+        let data = [(1, 2), (2, 3), (8, 10), (9, 11), (10, 12)].map(Point::from);
+        let k = 2;
+
+        let clusters_output = KmeansSerialBuilder::default()
+            .with_data(data.clone())
+            .with_k(k)
+            .with_initial_centers(data.into_iter().take(k as usize))
+            .execute();
+        let clusters_output_set: HashSet<Cluster> = HashSet::from_iter(clusters_output.clone());
+
+        let expected_set = HashSet::from_iter([
+            Cluster {
+                center: Point::from((1.5, 2.5)),
+                points: vec![Point::from((1, 2)), Point::from((2, 3))],
+            },
+            Cluster {
+                center: Point::from((9, 11)),
+                points: vec![
+                    Point::from((8, 10)),
+                    Point::from((9, 11)),
+                    Point::from((10, 12)),
+                ],
+            },
+        ]);
+
+        assert_eq!(expected_set, clusters_output_set);
     }
-}
 
-fn assignPoints(data: Vec<Point>, clusters: Vec<Cluster>) -> Vec<Cluster> {
-    let mut clusters: Vec<Cluster> = clusters
-        .into_iter()
-        .map(|cluster| Cluster {
-            center: cluster.center,
-            points: vec![],
-        })
-        .collect();
+    #[test]
+    fn test_kmeans_three_clusters() {
+        let data = [(1, 1), (2, 2), (8, 8), (9, 9), (20, 20), (21, 21)].map(Point::from);
+        let k = 3;
 
-    for point in data {
-        let mut min_distance = f64::MAX;
-        let mut index = 0;
-        for (i, cluster) in clusters.iter().enumerate() {
-            let distance = euclideanDistance(&point, &cluster.center);
-            if distance < min_distance {
-                min_distance = distance;
-                index = i;
-            }
-        }
-        clusters[index].points.push(point);
-    }
+        let clusters_output = KmeansSerialBuilder::default()
+            .with_data(data.clone())
+            .with_k(k)
+            .with_initial_centers(data.into_iter().take(k as usize))
+            .execute();
+        let clusters_output_set: HashSet<Cluster> = HashSet::from_iter(clusters_output.clone());
 
-    clusters
-}
+        let expected_set = HashSet::from_iter([
+            Cluster {
+                center: Point::from((1.5, 1.5)),
+                points: vec![Point::from((1, 1)), Point::from((2, 2))],
+            },
+            Cluster {
+                center: Point::from((8.5, 8.5)),
+                points: vec![Point::from((8, 8)), Point::from((9, 9))],
+            },
+            Cluster {
+                center: Point::from((20.5, 20.5)),
+                points: vec![Point::from((20, 20)), Point::from((21, 21))],
+            },
+        ]);
 
-fn converged(points1: &Vec<Point>, points2: &Vec<Point>) -> bool {
-    points1
-        .iter()
-        .zip(points2.iter())
-        .all(|(p1, p2)| p1.is_equal(&p2))
-}
-
-fn calculate_new_centers(cluster: &Vec<Cluster>) -> Vec<Point> {
-    cluster
-        .into_iter()
-        .map(|cluster| calculate_center(cluster))
-        .collect()
-}
-
-fn calculate_center(cluster: &Cluster) -> Point {
-    let x_sum: f64 = cluster.points.iter().map(|point| point.x).sum();
-    let y_sum: f64 = cluster.points.iter().map(|point| point.x).sum();
-    Point {
-        x: x_sum / cluster.points.len() as f64,
-        y: y_sum / cluster.points.len() as f64,
-    }
-}
-
-fn euclideanDistance(a: &Point, b: &Point) -> f64 {
-    ((a.x - b.x).powi(2) + (a.y - b.y).powi(2)).sqrt()
-}
-
-#[derive(Debug, Clone)]
-struct Point {
-    pub x: f64,
-    pub y: f64,
-}
-
-impl Point {
-    pub fn is_equal(&self, other: &Point) -> bool {
-        self.x == other.x && self.y == other.y
-    }
-}
-
-impl From<(f64, f64)> for Point {
-    fn from((x, y): (f64, f64)) -> Self {
-        Self { x, y }
-    }
-}
-
-#[derive(Debug)]
-struct Cluster {
-    pub center: Point,
-    pub points: Vec<Point>,
-}
-impl Cluster {
-    pub fn init(points: Vec<Point>, k: u8) -> Vec<Self> {
-        (0..k)
-            .into_iter()
-            .map(|i| points.get(i as usize).unwrap())
-            .cloned()
-            .map(|center| Self {
-                center,
-                points: Vec::new(),
-            })
-            .collect()
+        assert_eq!(expected_set, clusters_output_set);
     }
 }
