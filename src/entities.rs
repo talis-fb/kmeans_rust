@@ -1,13 +1,14 @@
 #[derive(Debug, Clone, PartialEq)]
-pub struct Point {
+pub struct Point<'a> {
+    label: Option<&'a str>,
     x: f64,
     y: f64,
     z: f64,
 }
 
-impl Eq for Point {}
+impl Eq for Point<'_> {}
 
-impl std::hash::Hash for Point {
+impl std::hash::Hash for Point<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.x.to_bits().hash(state);
         self.y.to_bits().hash(state);
@@ -15,7 +16,7 @@ impl std::hash::Hash for Point {
     }
 }
 
-impl Point {
+impl<'a> Point<'a> {
     pub fn from<T, const N: usize>(arr: [T; N]) -> Self
     where
         T: Into<f64>,
@@ -25,7 +26,13 @@ impl Point {
             x: *arr.get(0).unwrap_or(&f64::default()),
             y: *arr.get(1).unwrap_or(&f64::default()),
             z: *arr.get(2).unwrap_or(&f64::default()),
+            label: None,
         }
+    }
+
+    pub fn with_label(mut self, label: &'a str) -> Self {
+        self.label = Some(label);
+        self
     }
 
     pub fn euclidean_distance(&self, other: &Point) -> f64 {
@@ -37,20 +44,20 @@ impl Point {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Cluster {
-    pub center: Point,
-    pub points: Vec<Point>,
+pub struct Cluster<'a, 'b> {
+    pub center: Point<'b>,
+    pub points: Vec<&'a Point<'a>>,
 }
 
-impl Cluster {
-    pub fn from_center(center: Point) -> Self {
+impl<'a, 'b> Cluster<'a, 'b> {
+    pub fn from_center(center: Point<'b>) -> Self {
         Self {
             center,
             points: Vec::new(),
         }
     }
 
-    pub fn calculate_center_point(&self) -> Point {
+    pub fn calculate_center_point(&self) -> Point<'b> {
         let x_sum: f64 = self.points.iter().map(|point| point.x).sum();
         let y_sum: f64 = self.points.iter().map(|point| point.y).sum();
         let z_sum: f64 = self.points.iter().map(|point| point.z).sum();
@@ -58,6 +65,7 @@ impl Cluster {
             x: x_sum / self.points.len() as f64,
             y: y_sum / self.points.len() as f64,
             z: z_sum / self.points.len() as f64,
+            label: None,
         }
     }
 }

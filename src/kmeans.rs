@@ -3,14 +3,14 @@
 use crate::entities::{Cluster, Point};
 
 #[derive(Default)]
-pub struct KmeansSerialBuilder {
-    pub data: Vec<Point>,
+pub struct KmeansSerialBuilder<'a, 'b> {
+    pub data: Vec<Point<'a>>,
     pub k: u8,
-    pub initial_centers: Option<Vec<Point>>,
+    pub initial_centers: Option<Vec<Point<'b>>>,
 }
 
-impl KmeansSerialBuilder {
-    pub fn with_data(mut self, data: impl IntoIterator<Item = Point>) -> Self {
+impl<'a, 'b> KmeansSerialBuilder<'a, 'b> {
+    pub fn with_data(mut self, data: impl IntoIterator<Item = Point<'a>>) -> Self {
         self.data = data.into_iter().collect();
         self
     }
@@ -22,13 +22,13 @@ impl KmeansSerialBuilder {
 
     pub fn with_initial_centers(
         mut self,
-        initial_centers: impl IntoIterator<Item = Point>,
+        initial_centers: impl IntoIterator<Item = Point<'b>>,
     ) -> Self {
         self.initial_centers = Some(initial_centers.into_iter().collect());
         self
     }
 
-    pub fn execute(self) -> Vec<Cluster> {
+    pub fn execute<'c>(self) -> Vec<Cluster<'a, 'c>> {
         let initial_centers = self
             .initial_centers
             .unwrap_or_else(|| utils::get_n_random_points(&self.data, self.k as usize));
@@ -63,13 +63,13 @@ mod utils {
     use super::*;
     use rand::seq::SliceRandom;
 
-    pub fn get_n_random_points(points: &[Point], n: usize) -> Vec<Point> {
+    pub fn get_n_random_points<'a>(points: &[Point<'a>], n: usize) -> Vec<Point<'a>> {
         let mut points = points.to_vec();
         points.shuffle(&mut rand::thread_rng());
         points.iter().take(n).cloned().collect()
     }
 
-    pub fn assign_points(data: &Vec<Point>, mut clusters: Vec<Cluster>) -> Vec<Cluster> {
+    pub fn assign_points<'a, 'b>(data: &'a Vec<Point<'a>>, mut clusters: Vec<Cluster<'a, 'b>>) -> Vec<Cluster<'a, 'b>> {
         for point in data {
             let mut min_distance = f64::MAX;
             let mut index = 0;
@@ -80,7 +80,7 @@ mod utils {
                     index = i;
                 }
             }
-            clusters[index].points.push(point.clone());
+            clusters[index].points.push(point);
         }
 
         clusters
@@ -90,7 +90,7 @@ mod utils {
         points1.iter().zip(points2.iter()).all(|(p1, p2)| p1 == p2)
     }
 
-    pub fn calculate_new_centers(cluster: &Vec<Cluster>) -> Vec<Point> {
+    pub fn calculate_new_centers<'a>(cluster: &'a Vec<Cluster<'_, '_>>) -> Vec<Point<'a>> {
         cluster
             .into_iter()
             .map(|cluster| cluster.calculate_center_point())
