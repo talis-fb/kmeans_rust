@@ -10,24 +10,6 @@ pub struct KmeansSerialBuilder {
 }
 
 impl KmeansSerialBuilder {
-    pub fn with_data(mut self, data: impl IntoIterator<Item = Point>) -> Self {
-        self.data = data.into_iter().collect();
-        self
-    }
-
-    pub fn with_k(mut self, k: u8) -> Self {
-        self.k = k;
-        self
-    }
-
-    pub fn with_initial_centers(
-        mut self,
-        initial_centers: impl IntoIterator<Item = Point>,
-    ) -> Self {
-        self.initial_centers = Some(initial_centers.into_iter().collect());
-        self
-    }
-
     pub fn execute(self) -> Vec<Cluster> {
         let initial_centers = self
             .initial_centers
@@ -56,6 +38,24 @@ impl KmeansSerialBuilder {
                 .map(|center| Cluster::from_center(center))
                 .collect();
         }
+    }
+
+    pub fn with_data(mut self, data: impl IntoIterator<Item = Point>) -> Self {
+        self.data = data.into_iter().collect();
+        self
+    }
+
+    pub fn with_k(mut self, k: u8) -> Self {
+        self.k = k;
+        self
+    }
+
+    pub fn with_initial_centers(
+        mut self,
+        initial_centers: impl IntoIterator<Item = Point>,
+    ) -> Self {
+        self.initial_centers = Some(initial_centers.into_iter().collect());
+        self
     }
 }
 

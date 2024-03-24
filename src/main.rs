@@ -1,8 +1,58 @@
+use std::{error::Error, fs::File};
+use serde::Deserialize;
+
+use crate::kmeans::KmeansSerialBuilder;
+
 mod entities;
 mod kmeans;
+mod input;
 
-fn main() {
-    println!("nothing here.");
+fn main() -> Result<(), Box<dyn Error>> {
+    let input_file = std::env::args_os().nth(1).expect("no input file given");
+    let file = File::open(input_file)?;
+
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .delimiter(b' ')
+        .from_reader(file);
+
+    let mut ele = Vec::new();
+
+    for result in rdr.deserialize() {
+        let record: (String, f64, f64, f64) = result?;
+        ele.push(record);
+        // println!("{:?}", record);
+    }
+
+    println!("1 Ok");
+
+    let values = ele
+        .into_iter()
+        .map(|(label, x, y, z)| entities::Point::from([x, y, z]).with_label(&label))
+        .collect::<Vec<entities::Point>>();
+
+    println!("2 ok {}", values.len());
+
+
+    let kmeans = KmeansSerialBuilder::default().with_data(values).with_k(3);
+
+
+    let clusters = kmeans.execute();
+    println!("3 ok {}", clusters.len());
+
+
+    // write clusters
+    let out = csv::WriterBuilder::new().delimiter(b' ').from_writer(std::io::stdout());
+    for c in clusters {
+        // let center = 
+        out.write_record(record)
+    }
+
+    // write values
+
+
+
+    Ok(())
 }
 
 #[cfg(test)]
