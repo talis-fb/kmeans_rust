@@ -16,7 +16,7 @@ mod tests {
 
     #[test]
     fn test_kmeans_two_points() {
-        let data = [Point::from((1, 2)), Point::from((5, 8))];
+        let data = [Point::from([ 1, 2 ]), Point::from([ 5, 8 ])];
         let k = 2;
 
         let clusters_output = KmeansSerialBuilder::default()
@@ -31,12 +31,12 @@ mod tests {
 
         let expected_set = HashSet::from_iter([
             Cluster {
-                center: Point::from((1, 2)),
-                points: vec![Point::from((1, 2))],
+                center: Point::from([ 1, 2 ]),
+                points: vec![Point::from([ 1, 2 ])],
             },
             Cluster {
-                center: Point::from((5, 8)),
-                points: vec![Point::from((5, 8))],
+                center: Point::from([ 5, 8 ]),
+                points: vec![Point::from([ 5, 8 ])],
             },
         ]);
 
@@ -45,7 +45,7 @@ mod tests {
 
     #[test]
     fn test_kmeans_few_points() {
-        let data = [(1, 2), (2, 3), (8, 10), (9, 11), (10, 12)].map(Point::from);
+        let data = [[ 1, 2 ], [ 2, 3 ], [ 8, 10 ], [ 9, 11 ], [ 10, 12 ]].map(Point::from);
         let k = 2;
 
         let clusters_output = KmeansSerialBuilder::default()
@@ -57,15 +57,15 @@ mod tests {
 
         let expected_set = HashSet::from_iter([
             Cluster {
-                center: Point::from((1.5, 2.5)),
-                points: vec![Point::from((1, 2)), Point::from((2, 3))],
+                center: Point::from([ 1.5, 2.5 ]),
+                points: vec![Point::from([ 1, 2 ]), Point::from([ 2, 3 ])],
             },
             Cluster {
-                center: Point::from((9, 11)),
+                center: Point::from([ 9, 11 ]),
                 points: vec![
-                    Point::from((8, 10)),
-                    Point::from((9, 11)),
-                    Point::from((10, 12)),
+                    Point::from([ 8, 10 ]),
+                    Point::from([ 9, 11 ]),
+                    Point::from([ 10, 12 ]),
                 ],
             },
         ]);
@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn test_kmeans_three_clusters() {
-        let data = [(1, 1), (2, 2), (8, 8), (9, 9), (20, 20), (21, 21)].map(Point::from);
+        let data = [[ 1, 1 ], [ 2, 2 ], [ 8, 8 ], [ 9, 9 ], [ 20, 20 ], [ 21, 21 ]].map(Point::from);
         let k = 3;
 
         let clusters_output = KmeansSerialBuilder::default()
@@ -87,16 +87,16 @@ mod tests {
 
         let expected_set = HashSet::from_iter([
             Cluster {
-                center: Point::from((1.5, 1.5)),
-                points: vec![Point::from((1, 1)), Point::from((2, 2))],
+                center: Point::from([ 1.5, 1.5 ]),
+                points: vec![Point::from([ 1, 1 ]), Point::from([ 2, 2 ])],
             },
             Cluster {
-                center: Point::from((8.5, 8.5)),
-                points: vec![Point::from((8, 8)), Point::from((9, 9))],
+                center: Point::from([ 8.5, 8.5 ]),
+                points: vec![Point::from([ 8, 8 ]), Point::from([ 9, 9 ])],
             },
             Cluster {
-                center: Point::from((20.5, 20.5)),
-                points: vec![Point::from((20, 20)), Point::from((21, 21))],
+                center: Point::from([ 20.5, 20.5 ]),
+                points: vec![Point::from([ 20, 20 ]), Point::from([ 21, 21 ])],
             },
         ]);
 
