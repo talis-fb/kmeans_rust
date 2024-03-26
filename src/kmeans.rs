@@ -96,5 +96,4 @@ mod utils {
             .map(|cluster| cluster.calculate_center_point())
             .collect()
     }
-
 }

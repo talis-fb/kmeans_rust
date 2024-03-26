@@ -5,7 +5,7 @@ pub struct Point {
     x: f64,
     y: f64,
     z: f64,
-    label: Option<Arc<str>>
+    label: Option<Arc<str>>,
 }
 
 impl Eq for Point {}
@@ -28,13 +28,21 @@ impl Point {
             x: *arr.get(0).unwrap_or(&f64::default()),
             y: *arr.get(1).unwrap_or(&f64::default()),
             z: *arr.get(2).unwrap_or(&f64::default()),
-            label: None
+            label: None,
         }
     }
 
     pub fn with_label(mut self, label: &str) -> Self {
         self.label = Some(label.into());
         self
+    }
+
+    pub fn get_label(&self) -> Option<&str> {
+        self.label.as_deref()
+    }
+
+    pub fn get_data(&self) -> [f64; 3] {
+        [self.x, self.y, self.z]
     }
 
     pub fn euclidean_distance(&self, other: &Point) -> f64 {
@@ -67,7 +75,7 @@ impl Cluster {
             x: x_sum / self.points.len() as f64,
             y: y_sum / self.points.len() as f64,
             z: z_sum / self.points.len() as f64,
-            label: None
+            label: None,
         }
     }
 }
