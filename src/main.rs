@@ -1,85 +1,97 @@
-use serde::Deserialize;
-use std::{error::Error, fs::File};
+use std::error::Error;
 
-use crate::{entities::Point, kmeans::KmeansSerialBuilder};
+use clap::Parser;
+use kmeans::{Kmeans, parallel::KmeansParallelBuilder};
+
+use crate::{entities::Point, kmeans::serial::KmeansSerialBuilder};
 
 mod entities;
 mod input;
 mod kmeans;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let input_file = std::env::args_os().nth(1).expect("no input file given");
-    let file = File::open(input_file)?;
+    let matches = input::Args::parse();
 
-    let mut rdr = csv::ReaderBuilder::new()
-        .has_headers(false)
-        .delimiter(b' ')
-        .from_reader(file);
+    let mut csv_builder = csv::ReaderBuilder::new();
+    let csv_builder = csv_builder.has_headers(false).delimiter(b' ');
 
-    let mut ele = Vec::new();
+    let input_values: Vec<(String, f64, f64, f64)> = match matches.input_file {
+        Some(path) => {
+            let mut reader = csv_builder.from_path(path)?;
+            reader
+                .deserialize()
+                .into_iter()
+                .filter_map(Result::unwrap)
+                .collect()
+        }
+        None => {
+            let mut reader = csv_builder.from_reader(std::io::stdin());
+            reader
+                .deserialize()
+                .into_iter()
+                .filter_map(Result::unwrap)
+                .collect()
+        }
+    };
 
-    for result in rdr.deserialize() {
-        let record: (String, f64, f64, f64) = result?;
-        ele.push(record);
-        // println!("{:?}", record);
-    }
-
-    println!("1 Ok");
-
-    let values = ele
+    // Kmeans
+    let k = matches.k;
+    let values = input_values
         .into_iter()
         .map(|(label, x, y, z)| Point::from([x, y, z]).with_label(&label))
         .collect::<Vec<Point>>();
 
-    println!("2 ok  => {}", values.len());
+    // let kmeans_runner = KmeansSerialBuilder::default();
+    let kmeans_runner: Box<dyn Kmeans> = match matches.mode {
+        input::Mode::S=> Box::new(KmeansSerialBuilder::default()),
+        input::Mode::Par=> Box::new(KmeansParallelBuilder::default()),
+    };
 
-    let size_in_bytes = values.len() * std::mem::size_of::<Vec<Point>>();
-    let size_in_mb = size_in_bytes as f64 / (1024.0 * 1024.0);
-    
-    println!("Size of the Vec<Point>: {} bytes", size_in_bytes);
-    println!("Size of the Vec<Point>: {:.2} MB", size_in_mb);
+    let clusters = kmeans_runner.execute(&values, k as u8);
 
-    let kmeans = KmeansSerialBuilder::default().with_data(values).with_k(10);
+    // Create the output: Replacing all points by the center of their cluster
+    let output_values: Vec<Vec<String>> = if matches.replace_entry {
+        clusters
+            .iter()
+            .flat_map(|el| {
+                el.points
+                    .iter()
+                    .map(|p| el.center.clone().with_label(p.get_label().unwrap_or("--")))
+            })
+            .map(|point| {
+                let label = point.get_label().unwrap_or("--");
+                let [x, y, z] = point.get_data().map(|n| n.max(0.0).min(255.0) as u8);
 
-    let clusters = kmeans.execute();
+                vec![
+                    label.to_string(),
+                    x.to_string(),
+                    y.to_string(),
+                    z.to_string(),
+                ]
+            })
+            .collect()
+    } else {
+        todo!()
+    };
 
-    println!("3 ok {}", clusters.len());
-    println!("---------------");
-    println!("Clusters...");
-    println!("  {:?}", clusters.len());
-    println!("---------------");
+    // Write to output file
+    let mut csv_writer = csv::WriterBuilder::new();
+    let csv_write = csv_writer.has_headers(false).delimiter(b' ');
 
-    // Overwrite all data with point of their clusters
-    let points_of_clusters: Vec<Point> = clusters
-        .iter()
-        .flat_map(|el| {
-            el.points
-                .iter()
-                .map(|p| el.center.clone().with_label(p.get_label().unwrap_or("--")))
-        })
-        .collect();
-
-    // write clusters
-    let mut out = csv::WriterBuilder::new()
-        .delimiter(b' ')
-        .from_writer(std::io::stdout());
-
-    for point in points_of_clusters {
-        // let center =
-        let label = point.get_label().unwrap_or("--");
-        // let [x, y, z] = point.get_data();
-        let [x, y, z] = point.get_data().map(|n| n.max(0.0).min(255.0) as u8);
-
-        let record = vec![
-            label.to_string(),
-            x.to_string(),
-            y.to_string(),
-            z.to_string(),
-        ];
-        out.write_record(record).unwrap();
+    match matches.output_file {
+        Some(path) => {
+            let mut writer = csv_write.from_path(path)?;
+            for row in output_values {
+                writer.write_record(row)?;
+            }
+        }
+        None => {
+            let mut writer = csv_write.from_writer(std::io::stdout());
+            for row in output_values {
+                writer.write_record(row)?;
+            }
+        }
     }
-
-    // write values
 
     Ok(())
 }
@@ -88,96 +100,121 @@ fn main() -> Result<(), Box<dyn Error>> {
 mod tests {
     use std::collections::HashSet;
 
-    use crate::kmeans::KmeansSerialBuilder;
+    use crate::kmeans::{serial::KmeansSerialBuilder, Kmeans};
 
     use super::*;
     use entities::{Cluster, Point};
 
     #[test]
     fn test_kmeans_two_points() {
-        let data = [Point::from([1, 2]), Point::from([5, 8])];
+        let data = vec![Point::from([1, 2]), Point::from([5, 8])];
         let k = 2;
 
         let clusters_output = KmeansSerialBuilder::default()
-            .with_data(data.clone())
-            .with_k(k)
-            .with_initial_centers(data.into_iter().take(k as usize))
-            .execute();
+            .with_initial_centers(data.clone().into_iter().take(k as usize))
+            .execute(&data, k);
 
         let clusters_output_set: HashSet<Cluster> = HashSet::from_iter(clusters_output.clone());
 
         assert_eq!(clusters_output.len(), k as usize);
 
-        let expected_set = HashSet::from_iter([
-            Cluster {
-                center: Point::from([1, 2]),
-                points: vec![Point::from([1, 2])],
-            },
-            Cluster {
-                center: Point::from([5, 8]),
-                points: vec![Point::from([5, 8])],
-            },
-        ]);
+        // Expected Cluster 1
+        let center = Point::from([1, 2]);
+        let points = vec![Point::from([1, 2])];
+        let cluster1 = Cluster {
+            center,
+            points: points.iter().collect(),
+        };
+
+        // Expected Cluster 2
+        let center = Point::from([5, 8]);
+        let points = vec![Point::from([5, 8])];
+        let cluster2 = Cluster {
+            center,
+            points: points.iter().collect(),
+        };
+
+        let expected_set = HashSet::from_iter([cluster1, cluster2]);
 
         assert_eq!(expected_set, clusters_output_set);
     }
 
     #[test]
     fn test_kmeans_few_points() {
-        let data = [[1, 2], [2, 3], [8, 10], [9, 11], [10, 12]].map(Point::from);
+        let data = [[1, 2], [2, 3], [8, 10], [9, 11], [10, 12]]
+            .map(Point::from)
+            .to_vec();
         let k = 2;
 
         let clusters_output = KmeansSerialBuilder::default()
-            .with_data(data.clone())
-            .with_k(k)
-            .with_initial_centers(data.into_iter().take(k as usize))
-            .execute();
+            .with_initial_centers(data.iter().take(k as usize).cloned())
+            .execute(&data, k);
+
         let clusters_output_set: HashSet<Cluster> = HashSet::from_iter(clusters_output.clone());
 
-        let expected_set = HashSet::from_iter([
-            Cluster {
-                center: Point::from([1.5, 2.5]),
-                points: vec![Point::from([1, 2]), Point::from([2, 3])],
-            },
-            Cluster {
-                center: Point::from([9, 11]),
-                points: vec![
-                    Point::from([8, 10]),
-                    Point::from([9, 11]),
-                    Point::from([10, 12]),
-                ],
-            },
-        ]);
+        // Expected Cluster 1
+        let center = Point::from([1.5, 2.5]);
+        let points = vec![Point::from([1, 2]), Point::from([2, 3])];
+        let cluster1 = Cluster {
+            center,
+            points: points.iter().collect(),
+        };
+
+        // Expected Cluster 2
+        let center = Point::from([9, 11]);
+        let points = vec![
+            Point::from([8, 10]),
+            Point::from([9, 11]),
+            Point::from([10, 12]),
+        ];
+        let cluster2 = Cluster {
+            center,
+            points: points.iter().collect(),
+        };
+
+        let expected_set = HashSet::from_iter([cluster1, cluster2]);
 
         assert_eq!(expected_set, clusters_output_set);
     }
 
     #[test]
     fn test_kmeans_three_clusters() {
-        let data = [[1, 1], [2, 2], [8, 8], [9, 9], [20, 20], [21, 21]].map(Point::from);
+        let data = [[1, 1], [2, 2], [8, 8], [9, 9], [20, 20], [21, 21]]
+            .map(Point::from)
+            .to_vec();
         let k = 3;
 
         let clusters_output = KmeansSerialBuilder::default()
-            .with_data(data.clone())
-            .with_k(k)
-            .with_initial_centers(data.into_iter().take(k as usize))
-            .execute();
+            .with_initial_centers(data.iter().take(k as usize).cloned())
+            .execute(&data, k);
+
         let clusters_output_set: HashSet<Cluster> = HashSet::from_iter(clusters_output.clone());
 
-        let expected_set = HashSet::from_iter([
-            Cluster {
-                center: Point::from([1.5, 1.5]),
-                points: vec![Point::from([1, 1]), Point::from([2, 2])],
-            },
-            Cluster {
-                center: Point::from([8.5, 8.5]),
-                points: vec![Point::from([8, 8]), Point::from([9, 9])],
-            },
-            Cluster {
-                center: Point::from([20.5, 20.5]),
-                points: vec![Point::from([20, 20]), Point::from([21, 21])],
-            },
-        ]);
+        // Expected Cluster 1
+        let center = Point::from([1.5, 1.5]);
+        let points = vec![Point::from([1, 1]), Point::from([2, 2])];
+        let cluster1 = Cluster {
+            center,
+            points: points.iter().collect(),
+        };
+
+        // Expected Cluster 2
+        let center = Point::from([8.5, 8.5]);
+        let points = vec![Point::from([8, 8]), Point::from([9, 9])];
+        let cluster2 = Cluster {
+            center,
+            points: points.iter().collect(),
+        };
+
+        // Expected Cluster 2
+        let center = Point::from([20.5, 20.5]);
+        let points = vec![Point::from([20, 20]), Point::from([21, 21])];
+        let cluster3 = Cluster {
+            center,
+            points: points.iter().collect(),
+        };
+
+        let expected_set = HashSet::from_iter([cluster1, cluster2, cluster3]);
 
         assert_eq!(expected_set, clusters_output_set);
     }

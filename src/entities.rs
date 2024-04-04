@@ -54,12 +54,12 @@ impl Point {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Cluster {
+pub struct Cluster<'a> {
     pub center: Point,
-    pub points: Vec<Point>,
+    pub points: Vec<&'a Point>,
 }
 
-impl Cluster {
+impl Cluster<'_> {
     pub fn from_center(center: Point) -> Self {
         Self {
             center,
