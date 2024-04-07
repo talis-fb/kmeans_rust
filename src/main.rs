@@ -1,13 +1,22 @@
 use std::error::Error;
+use std::sync::OnceLock;
 
 use clap::Parser;
-use kmeans::{Kmeans, parallel::KmeansParallelBuilder};
+use kmeans::{
+    parallel::KmeansParallelBuilder, parallel_2::KmeansParallelBuilder2, tokio::KmeansTokioBuilder,
+    Kmeans,
+};
 
 use crate::{entities::Point, kmeans::serial::KmeansSerialBuilder};
 
 mod entities;
 mod input;
 mod kmeans;
+
+fn input_data(data: Vec<Point>) -> &'static Vec<Point> {
+    static COMPUTATION: OnceLock<Vec<Point>> = OnceLock::new();
+    COMPUTATION.get_or_init(|| data)
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = input::Args::parse();
@@ -40,11 +49,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         .into_iter()
         .map(|(label, x, y, z)| Point::from([x, y, z]).with_label(&label))
         .collect::<Vec<Point>>();
+    let values = input_data(values);
 
     // let kmeans_runner = KmeansSerialBuilder::default();
     let kmeans_runner: Box<dyn Kmeans> = match matches.mode {
-        input::Mode::S=> Box::new(KmeansSerialBuilder::default()),
-        input::Mode::Par=> Box::new(KmeansParallelBuilder::default()),
+        input::Mode::S => Box::new(KmeansSerialBuilder::default()),
+        input::Mode::Par => Box::new(KmeansParallelBuilder2::default()),
+        input::Mode::Tokio => Box::new(KmeansTokioBuilder::default()),
     };
 
     let clusters = kmeans_runner.execute(&values, k as u8);

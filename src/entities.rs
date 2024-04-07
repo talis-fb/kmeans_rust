@@ -1,11 +1,21 @@
 use std::sync::Arc;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Point {
     x: f64,
     y: f64,
     z: f64,
     label: Option<Arc<str>>,
+}
+
+impl Ord for Point {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.x
+            .to_bits()
+            .cmp(&other.x.to_bits())
+            .then_with(|| self.y.to_bits().cmp(&other.y.to_bits()))
+            .then_with(|| self.z.to_bits().cmp(&other.z.to_bits()))
+    }
 }
 
 impl Eq for Point {}

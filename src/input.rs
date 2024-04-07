@@ -27,4 +27,7 @@ pub enum Mode {
 
     /// Run in parallel
     Par,
+
+    /// Run in Tokio
+    Tokio,
 }

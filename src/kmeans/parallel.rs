@@ -2,12 +2,11 @@
 
 use std::sync::mpsc;
 
-use rayon::iter::IntoParallelRefIterator;
-use rayon::iter::ParallelIterator;
+use rayon::prelude::*;
 
 use crate::entities::{Cluster, Point};
 
-use super::{Kmeans, common};
+use super::{common, Kmeans};
 
 #[derive(Default)]
 pub struct KmeansParallelBuilder {
@@ -15,7 +14,7 @@ pub struct KmeansParallelBuilder {
 }
 
 impl Kmeans for KmeansParallelBuilder {
-    fn execute<'a>(&'a self, data: &'a Vec<Point>, k: u8) -> Vec<Cluster<'a>> {
+    fn execute<'a>(&'a self, data: &'static Vec<Point>, k: u8) -> Vec<Cluster<'a>> {
         let initial_centers: Vec<Point> = self
             .initial_centers
             .clone()
@@ -26,24 +25,37 @@ impl Kmeans for KmeansParallelBuilder {
             .map(|center| Cluster::from_center(center))
             .collect::<Vec<Cluster>>();
 
+        let mut i: u64 = 1;
         loop {
-            std::thread::scope(|scope| {
-                let clusters_to_read = clusters.clone();
-                let clusters_to_write = &mut clusters;
+            eprintln!("iteration {}", i);
+            let clusters_to_read = clusters.clone();
+            let clusters_to_write = &mut clusters;
 
-                let (tx, rx) = mpsc::channel::<(&Point, usize)>();
+            let (tx, rx) = mpsc::channel::<(&Point, usize)>();
 
-                scope.spawn(move || {
+            // eprintln!("b");
+            rayon::scope(move |scope| {
+                scope.spawn(move |_| {
                     while let Ok((point, index)) = rx.recv() {
+                        eprintln!("> {:?}", point.get_label());
                         clusters_to_write[index].points.push(point);
                     }
                 });
 
-                data.par_iter().for_each(|point| {
-                    let index = common::get_closest_cluster_index(&point, &clusters_to_read);
-                    tx.send((point, index)).unwrap();
+                // eprintln!("middle");
+                scope.spawn(move |_| {
+                    data.par_iter().for_each(|point| {
+                        eprintln!("b {:?}", point.get_label());
+                        let index = common::get_closest_cluster_index(&point, &clusters_to_read);
+                        tx.send((point, index)).unwrap();
+                        eprintln!("e {:?}", point.get_label());
+                    });
                 });
+                // eprintln!("end pre");
             });
+            // eprintln!("end pos");
+
+            i = i.saturating_add(1);
 
             let new_centers: Vec<Point> = common::calculate_new_centers_parallel(&clusters);
             let old_centers: Vec<_> = clusters.iter().map(|cluster| &cluster.center).collect();
