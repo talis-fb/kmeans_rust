@@ -8,5 +8,10 @@ pub mod tokio;
 pub mod common;
 
 pub trait Kmeans {
-    fn execute<'a>(&'a self, data: &'static Vec<Point>, k: u8) -> Vec<Cluster<'a>>;
+    fn execute<'a>(
+        &self,
+        data: &'static Vec<Point>,
+        k: u8,
+        initial_centers: Vec<Point>,
+    ) -> Vec<Cluster<'a>>;
 }

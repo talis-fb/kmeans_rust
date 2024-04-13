@@ -16,6 +16,9 @@ pub struct Args {
     #[arg(short, long, default_value = "true")]
     pub replace_entry: bool,
 
+    #[arg(short, long, default_value = "false")]
+    pub random_initial: bool,
+
     /// Main entry
     pub input_file: Option<PathBuf>,
 }

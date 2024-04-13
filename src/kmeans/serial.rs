@@ -7,17 +7,15 @@ use super::common;
 use super::Kmeans;
 
 #[derive(Default)]
-pub struct KmeansSerialBuilder {
-    pub initial_centers: Option<Vec<Point>>,
-}
+pub struct KmeansSerialBuilder;
 
 impl Kmeans for KmeansSerialBuilder {
-    fn execute<'a>(&'a self, data: &'a Vec<Point>, k: u8) -> Vec<Cluster<'a>> {
-        let initial_centers = self
-            .initial_centers
-            .clone()
-            .unwrap_or_else(|| common::get_n_random_points(data, k as usize));
-
+    fn execute<'a>(
+        &self,
+        data: &'static Vec<Point>,
+        _k: u8,
+        initial_centers: Vec<Point>,
+    ) -> Vec<Cluster<'a>> {
         let mut clusters = initial_centers
             .into_iter()
             .map(|center| Cluster::from_center(center))
@@ -25,7 +23,6 @@ impl Kmeans for KmeansSerialBuilder {
 
         let mut i: u64 = 1;
         loop {
-            // eprintln!("iteration {}", i);
             clusters = common::assign_points(data, clusters);
 
             i = i.saturating_add(1);
@@ -42,15 +39,5 @@ impl Kmeans for KmeansSerialBuilder {
                 .map(|center| Cluster::from_center(center))
                 .collect();
         }
-    }
-}
-
-impl KmeansSerialBuilder {
-    pub fn with_initial_centers(
-        mut self,
-        initial_centers: impl IntoIterator<Item = Point>,
-    ) -> Self {
-        self.initial_centers = Some(initial_centers.into_iter().collect());
-        self
     }
 }

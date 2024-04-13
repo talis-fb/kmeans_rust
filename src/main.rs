@@ -2,10 +2,7 @@ use std::error::Error;
 use std::sync::OnceLock;
 
 use clap::Parser;
-use kmeans::{
-    parallel::KmeansParallelBuilder, parallel_2::KmeansParallelBuilder2, tokio::KmeansTokioBuilder,
-    Kmeans,
-};
+use kmeans::{parallel_2::KmeansParallelBuilder2, tokio::KmeansTokioBuilder, Kmeans};
 
 use crate::{entities::Point, kmeans::serial::KmeansSerialBuilder};
 
@@ -51,16 +48,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         .collect::<Vec<Point>>();
     let values = input_data(values);
 
-    // let kmeans_runner = KmeansSerialBuilder::default();
+    let initial_centers = if matches.random_initial {
+        kmeans::common::get_n_random_points(values, k as usize)
+    } else {
+        values.iter().take(k as usize).cloned().collect()
+    };
+
+    eprintln!("Initial centers: {:?}", initial_centers);
+
+
     let kmeans_runner: Box<dyn Kmeans> = match matches.mode {
         input::Mode::S => Box::new(KmeansSerialBuilder::default()),
         input::Mode::Par => Box::new(KmeansParallelBuilder2::default()),
         input::Mode::Tokio => Box::new(KmeansTokioBuilder::default()),
     };
 
-    let clusters = kmeans_runner.execute(&values, k as u8);
+    let clusters = kmeans_runner.execute(&values, k as u8, initial_centers);
 
-    // Create the output: Replacing all points by the center of their cluster
     let output_values: Vec<Vec<String>> = if matches.replace_entry {
         clusters
             .iter()
@@ -119,11 +123,11 @@ mod tests {
     #[test]
     fn test_kmeans_two_points() {
         let data = vec![Point::from([1, 2]), Point::from([5, 8])];
-        let k = 2;
 
-        let clusters_output = KmeansSerialBuilder::default()
-            .with_initial_centers(data.clone().into_iter().take(k as usize))
-            .execute(&data, k);
+        let k = 2;
+        let initial_centers = data.iter().take(k as usize).cloned().collect();
+
+        let clusters_output = KmeansSerialBuilder::default().execute(&data, k, initial_centers);
 
         let clusters_output_set: HashSet<Cluster> = HashSet::from_iter(clusters_output.clone());
 
@@ -156,10 +160,9 @@ mod tests {
             .map(Point::from)
             .to_vec();
         let k = 2;
+        let initial_centers = data.iter().take(k as usize).cloned().collect();
 
-        let clusters_output = KmeansSerialBuilder::default()
-            .with_initial_centers(data.iter().take(k as usize).cloned())
-            .execute(&data, k);
+        let clusters_output = KmeansSerialBuilder::default().execute(&data, k, initial_centers);
 
         let clusters_output_set: HashSet<Cluster> = HashSet::from_iter(clusters_output.clone());
 
@@ -194,10 +197,9 @@ mod tests {
             .map(Point::from)
             .to_vec();
         let k = 3;
+        let initial_centers = data.iter().take(k as usize).cloned().collect();
 
-        let clusters_output = KmeansSerialBuilder::default()
-            .with_initial_centers(data.iter().take(k as usize).cloned())
-            .execute(&data, k);
+        let clusters_output = KmeansSerialBuilder::default().execute(&data, k, initial_centers);
 
         let clusters_output_set: HashSet<Cluster> = HashSet::from_iter(clusters_output.clone());
 

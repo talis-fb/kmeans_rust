@@ -9,19 +9,17 @@ use crate::entities::{Cluster, Point};
 use super::{common, Kmeans};
 
 #[derive(Default)]
-pub struct KmeansTokioBuilder {
-    pub initial_centers: Option<Vec<Point>>,
-}
+pub struct KmeansTokioBuilder;
 
 impl Kmeans for KmeansTokioBuilder {
-    fn execute<'a>(&'a self, data: &'static Vec<Point>, k: u8) -> Vec<Cluster<'a>> {
+    fn execute<'a>(
+        &self,
+        data: &'static Vec<Point>,
+        k: u8,
+        initial_centers: Vec<Point>,
+    ) -> Vec<Cluster<'a>> {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async move {
-            let initial_centers: Vec<Point> = self
-                .initial_centers
-                .clone()
-                .unwrap_or_else(|| common::get_n_random_points(&data, k as usize));
-
             let mut clusters = initial_centers
                 .into_iter()
                 .map(|center| Cluster::from_center(center))
@@ -89,19 +87,6 @@ impl Kmeans for KmeansTokioBuilder {
                     .map(|center| Cluster::from_center(center))
                     .collect();
             }
-
-            // TODO:
-            // The tests are right. The problemn is only the order
         })
-    }
-}
-
-impl KmeansTokioBuilder {
-    pub fn with_initial_centers(
-        mut self,
-        initial_centers: impl IntoIterator<Item = Point>,
-    ) -> Self {
-        self.initial_centers = Some(initial_centers.into_iter().collect());
-        self
     }
 }
