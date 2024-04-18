@@ -1,4 +1,7 @@
 use std::error::Error;
+
+use itertools::Itertools;
+
 use std::sync::OnceLock;
 
 use clap::Parser;
@@ -21,7 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut csv_builder = csv::ReaderBuilder::new();
     let csv_builder = csv_builder.has_headers(false).delimiter(b' ');
 
-    let input_values: Vec<(String, f64, f64, f64)> = match matches.input_file {
+    let input_values: Vec<(String, u32, u32, u32)> = match matches.input_file {
         Some(path) => {
             let mut reader = csv_builder.from_path(path)?;
             reader
@@ -51,11 +54,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let initial_centers = if matches.random_initial {
         kmeans::common::get_n_random_points(values, k as usize)
     } else {
-        values.iter().take(k as usize).cloned().collect()
+        values
+            .iter()
+            .unique_by(|p| p.get_values())
+            .take(k as usize)
+            .cloned()
+            .collect()
     };
 
     eprintln!("Initial centers: {:?}", initial_centers);
-
 
     let kmeans_runner: Box<dyn Kmeans> = match matches.mode {
         input::Mode::S => Box::new(KmeansSerialBuilder::default()),
@@ -75,7 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             })
             .map(|point| {
                 let label = point.get_label().unwrap_or("--");
-                let [x, y, z] = point.get_data().map(|n| n.max(0.0).min(255.0) as u8);
+                let [x, y, z] = point.get_data().map(|n| n.max(0).min(255) as u8);
 
                 vec![
                     label.to_string(),

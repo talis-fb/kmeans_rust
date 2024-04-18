@@ -9,7 +9,7 @@ pub fn get_n_random_points(points: &[Point], n: usize) -> Vec<Point> {
     points.iter().take(n).cloned().collect()
 }
 pub fn get_closest_cluster_index(point: &Point, clusters: &Vec<Cluster>) -> usize {
-    let mut min_distance = f64::MAX;
+    let mut min_distance = u32::MAX;
     let mut index = 0;
     for (i, cluster) in clusters.iter().enumerate() {
         let distance = point.euclidean_distance(&cluster.center);

@@ -1,43 +1,23 @@
 use std::sync::Arc;
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Point {
-    x: f64,
-    y: f64,
-    z: f64,
+    x: u32,
+    y: u32,
+    z: u32,
     label: Option<Arc<str>>,
-}
-
-impl Ord for Point {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.x
-            .to_bits()
-            .cmp(&other.x.to_bits())
-            .then_with(|| self.y.to_bits().cmp(&other.y.to_bits()))
-            .then_with(|| self.z.to_bits().cmp(&other.z.to_bits()))
-    }
-}
-
-impl Eq for Point {}
-
-impl std::hash::Hash for Point {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.x.to_bits().hash(state);
-        self.y.to_bits().hash(state);
-        self.z.to_bits().hash(state);
-    }
 }
 
 impl Point {
     pub fn from<T, const N: usize>(arr: [T; N]) -> Self
     where
-        T: Into<f64>,
+        T: Into<u32>,
     {
-        let arr: [f64; N] = arr.map(|n| n.into());
+        let arr: [u32; N] = arr.map(|n| n.into());
         Self {
-            x: *arr.get(0).unwrap_or(&f64::default()),
-            y: *arr.get(1).unwrap_or(&f64::default()),
-            z: *arr.get(2).unwrap_or(&f64::default()),
+            x: *arr.get(0).unwrap_or(&0),
+            y: *arr.get(1).unwrap_or(&0),
+            z: *arr.get(2).unwrap_or(&0),
             label: None,
         }
     }
@@ -51,15 +31,19 @@ impl Point {
         self.label.as_deref()
     }
 
-    pub fn get_data(&self) -> [f64; 3] {
+    pub fn get_data(&self) -> [u32; 3] {
         [self.x, self.y, self.z]
     }
 
-    pub fn euclidean_distance(&self, other: &Point) -> f64 {
+    pub fn euclidean_distance(&self, other: &Point) -> u32 {
         let x_diff = self.x - other.x;
         let y_diff = self.y - other.y;
         let z_diff = self.z - other.z;
-        x_diff.powi(2) + y_diff.powi(2) + z_diff.powi(2)
+        x_diff.pow(2) + y_diff.pow(2) + z_diff.pow(2)
+    }
+
+    pub fn get_values(&self) -> [u32; 3] {
+        [self.x, self.y, self.z]
     }
 }
 
@@ -78,14 +62,15 @@ impl Cluster<'_> {
     }
 
     pub fn calculate_center_point(&self) -> Point {
-        let x_sum: f64 = self.points.iter().map(|point| point.x).sum();
-        let y_sum: f64 = self.points.iter().map(|point| point.y).sum();
-        let z_sum: f64 = self.points.iter().map(|point| point.z).sum();
+        let x_sum: u32 = self.points.iter().map(|point| point.x).sum();
+        let y_sum: u32 = self.points.iter().map(|point| point.y).sum();
+        let z_sum: u32 = self.points.iter().map(|point| point.z).sum();
+        let len = self.points.len() as u32;
         Point {
-            x: x_sum / self.points.len() as f64,
-            y: y_sum / self.points.len() as f64,
-            z: z_sum / self.points.len() as f64,
             label: None,
+            x: x_sum.checked_div(len).unwrap_or(0),
+            y: y_sum.checked_div(len).unwrap_or(0),
+            z: z_sum.checked_div(len).unwrap_or(0),
         }
     }
 }
