@@ -9,7 +9,9 @@ use crate::entities::{Cluster, Point};
 use super::{common, Kmeans};
 
 #[derive(Default)]
-pub struct KmeansTokioBuilder;
+pub struct KmeansTokioBuilder {
+    pub max_threads: usize,
+}
 
 impl Kmeans for KmeansTokioBuilder {
     fn execute<'a>(
@@ -29,47 +31,65 @@ impl Kmeans for KmeansTokioBuilder {
 
             // A map based in index to sender points to add in clusters (tasks)
             loop {
-                let mut clusters_inputs: Vec<mpsc::Sender<&Point>> = Vec::with_capacity(k.into());
-
                 let (tx_final_clusters, mut rx_final_clusters) =
                     tokio::sync::mpsc::channel::<Cluster>(k.into());
 
-                for (_i, cluster) in clusters.iter().enumerate() {
-                    let center = cluster.center.clone();
+                // let mut clusters_inputs: Vec<Arc< mpsc::Sender<&Point> >> = Vec::with_capacity(k.into());
+                let clusters_senders: Arc<Vec<mpsc::Sender<&Point>>> = clusters
+                    .iter()
+                    .map(|cluster| {
+                        let (sender_points, mut listen_points) = mpsc::channel::<&Point>(500);
+                        tokio::task::spawn({
+                            let center = cluster.center.clone();
+                            let send_finish = tx_final_clusters.clone();
+                            async move {
+                                let mut points = Vec::with_capacity(data.len());
+                                eprintln!("Esperando pontos");
+                                eprintln!("center: {:?} / ", center.get_data());
+                                while let Some(point) = listen_points.recv().await {
+                                    // eprintln!("recebeu ponto");
+                                    points.push(point);
+                                }
+                                send_finish.send(Cluster { center, points }).await.unwrap();
+                                eprintln!("acabou cluster");
+                            }
+                        });
+                        sender_points
+                    })
+                    .collect::<Vec<mpsc::Sender<&Point>>>()
+                    .into();
 
-                    let (tx_points, mut rx_points) = mpsc::channel::<&Point>(50);
+                // Only threads creating cluster must remain open connections to this channel
+                drop(tx_final_clusters);
 
-                    clusters_inputs.push(tx_points);
+                let clusters_arc = Arc::new(clusters);
 
-                    let res = tx_final_clusters.clone();
-
+                let max_threads = self.max_threads.min(data.len());
+                for mut index in 0..max_threads {
+                    let clusters_senders = clusters_senders.clone();
+                    let clusters = clusters_arc.clone();
                     tokio::task::spawn(async move {
-                        let mut points = Vec::new();
-                        while let Some(point) = rx_points.recv().await {
-                            points.push(point);
+                        eprintln!("task with ind: {index}");
+                        while index < data.len() {
+                            let point = data.get(index).unwrap();
+
+                            let ind_closest_cluster =
+                                common::get_closest_cluster_index(point, clusters.as_ref());
+                            clusters_senders
+                                .get(ind_closest_cluster)
+                                .unwrap()
+                                .send(point)
+                                .await
+                                .unwrap();
+                            index += max_threads;
                         }
-                        res.send(Cluster { center, points }).await.unwrap();
                     });
                 }
 
-                drop(tx_final_clusters);
-
-                let clusters_arc = Arc::new(clusters.clone());
-
-                tokio::task::spawn(async move {
-                    let clusters_inputs_arc = Arc::new(clusters_inputs);
-
-                    for point in data.iter() {
-                        let input = clusters_inputs_arc.clone();
-                        let cl = clusters_arc.clone();
-                        tokio::task::spawn(async move {
-                            let i = common::get_closest_cluster_index(point, cl.as_ref());
-                            input.get(i).unwrap().send(point).await.unwrap();
-                        });
-                    }
-                });
+                drop(clusters_senders);
 
                 clusters = Vec::with_capacity(k as usize);
+                eprintln!("Esperando clusters");
                 while let Some(cluster) = rx_final_clusters.recv().await {
                     eprintln!("cluster {:?}", cluster.center);
                     clusters.push(cluster);

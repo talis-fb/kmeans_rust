@@ -28,8 +28,14 @@ pub enum Mode {
     /// Run in serial
     S,
 
-    /// Run in parallel
+    /// Run in parallel with std lib thread
     Par,
+
+    /// Run using rayon lib
+    Ray,
+
+    /// Run using rayon lib
+    Ray2,
 
     /// Run in Tokio
     Tokio,

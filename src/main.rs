@@ -7,7 +7,13 @@ use std::sync::OnceLock;
 use clap::Parser;
 use kmeans::{parallel_2::KmeansParallelBuilder2, tokio::KmeansTokioBuilder, Kmeans};
 
-use crate::{entities::Point, kmeans::serial::KmeansSerialBuilder};
+use crate::{
+    entities::Point,
+    kmeans::{
+        parallel::KmeansParallelBuilder, parallel_3::KmeansParallelStdBuilder,
+        serial::KmeansSerialBuilder,
+    },
+};
 
 mod entities;
 mod input;
@@ -66,8 +72,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let kmeans_runner: Box<dyn Kmeans> = match matches.mode {
         input::Mode::S => Box::new(KmeansSerialBuilder::default()),
-        input::Mode::Par => Box::new(KmeansParallelBuilder2::default()),
-        input::Mode::Tokio => Box::new(KmeansTokioBuilder::default()),
+        input::Mode::Par => Box::new(KmeansParallelStdBuilder { max_threads: 8 }),
+        input::Mode::Tokio => Box::new(KmeansTokioBuilder { max_threads: 8 }),
+        input::Mode::Ray => Box::new(KmeansParallelBuilder2::default()),
+        input::Mode::Ray2 => Box::new(KmeansParallelBuilder::default()),
     };
 
     let clusters = kmeans_runner.execute(&values, k as u8, initial_centers);
