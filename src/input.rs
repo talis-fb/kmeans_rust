@@ -31,6 +31,9 @@ pub enum Mode {
     /// Run in parallel with std lib thread
     Par,
 
+    /// Run in parallel with mutex
+    Mutex,
+
     /// Run using rayon lib
     Ray,
 

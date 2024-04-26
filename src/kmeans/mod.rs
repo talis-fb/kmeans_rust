@@ -3,6 +3,7 @@ use crate::entities::{Cluster, Point};
 pub mod parallel;
 pub mod parallel_2;
 pub mod parallel_3;
+pub mod parallel_mutex;
 pub mod serial;
 pub mod tokio;
 

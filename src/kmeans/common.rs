@@ -8,10 +8,14 @@ pub fn get_n_random_points(points: &[Point], n: usize) -> Vec<Point> {
     points.shuffle(&mut rand::thread_rng());
     points.iter().take(n).cloned().collect()
 }
-pub fn get_closest_cluster_index(point: &Point, clusters: &Vec<Cluster>) -> usize {
+
+pub fn get_closest_cluster_index<'a>(
+    point: &Point,
+    clusters: impl IntoIterator<Item = &'a Cluster<'a>>,
+) -> usize {
     let mut min_distance = u32::MAX;
     let mut index = 0;
-    for (i, cluster) in clusters.iter().enumerate() {
+    for (i, cluster) in clusters.into_iter().enumerate() {
         let distance = point.euclidean_distance(&cluster.center);
         if distance < min_distance {
             min_distance = distance;
@@ -40,8 +44,10 @@ pub fn converged<'a>(
         .all(|(p1, p2)| p1 == p2)
 }
 
-pub fn calculate_new_centers(cluster: &Vec<Cluster>) -> Vec<Point> {
-    cluster
+pub fn calculate_new_centers<'a>(
+    clusters: impl IntoIterator<Item = &'a Cluster<'a>>,
+) -> Vec<Point> {
+    clusters
         .into_iter()
         .map(|cluster| cluster.calculate_center_point())
         .collect()
