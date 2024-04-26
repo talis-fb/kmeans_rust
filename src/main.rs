@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let clusters = kmeans_runner.execute(&values, k as u8, initial_centers);
 
-    let output_values: Vec<Vec<String>> = if matches.replace_entry {
+    let output_values = if matches.replace_entry {
         clusters
             .iter()
             .flat_map(|el| {
@@ -99,7 +99,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                     z.to_string(),
                 ]
             })
-            .collect()
     } else {
         todo!()
     };
