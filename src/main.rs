@@ -11,7 +11,7 @@ use crate::{
     entities::Point,
     kmeans::{
         parallel::KmeansParallelBuilder, parallel_3::KmeansParallelStdBuilder,
-        serial::KmeansSerialBuilder, parallel_mutex::KmeansParallelMutex,
+        parallel_mutex::KmeansParallelMutex, serial::KmeansSerialBuilder,
     },
 };
 
@@ -68,8 +68,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             .collect()
     };
 
-    eprintln!("Initial centers: {:?}", initial_centers);
-
     let kmeans_runner: Box<dyn Kmeans> = match matches.mode {
         input::Mode::S => Box::new(KmeansSerialBuilder::default()),
         input::Mode::Par => Box::new(KmeansParallelStdBuilder { max_threads: 8 }),
@@ -79,27 +77,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         input::Mode::Ray2 => Box::new(KmeansParallelBuilder::default()),
     };
 
-
     let clusters = kmeans_runner.execute(&values, k as u8, initial_centers);
-
 
     let output_values = if matches.replace_entry {
         clusters
             .iter()
             .flat_map(|el| {
-                eprintln!(">>>>>>>> 0");
-                eprintln!("{:?}", el);
-                let saida = el.points
+                el.points
                     .iter()
-                    .map(|p| el.center.clone().with_label(p.get_label().unwrap_or("--")));
-                eprintln!(">>>>>>>> 1");
-                eprintln!("{:?}", saida);
-                saida
+                    .map(|p| el.center.clone().with_label(p.get_label().unwrap_or("--")))
             })
             .map(|point| {
                 let label = point.get_label().unwrap_or("--");
                 let [x, y, z] = point.get_data().map(|n| n.max(0).min(255) as u8);
-                eprintln!(">>>>>>>> ");
 
                 vec![
                     label.to_string(),
@@ -125,9 +115,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         None => {
             let mut writer = csv_write.from_writer(std::io::stdout());
-                eprintln!("# opa");
             for row in output_values {
-                eprintln!("# aqq");
                 writer.write_record(row)?;
             }
         }
