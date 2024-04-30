@@ -34,7 +34,6 @@ impl Kmeans for KmeansTokioBuilder {
                 let (tx_final_clusters, mut rx_final_clusters) =
                     tokio::sync::mpsc::channel::<Cluster>(k.into());
 
-                // let mut clusters_inputs: Vec<Arc< mpsc::Sender<&Point> >> = Vec::with_capacity(k.into());
                 let clusters_senders: Arc<Vec<mpsc::Sender<&Point>>> = clusters
                     .iter()
                     .map(|cluster| {
@@ -44,14 +43,10 @@ impl Kmeans for KmeansTokioBuilder {
                             let send_finish = tx_final_clusters.clone();
                             async move {
                                 let mut points = Vec::with_capacity(data.len());
-                                eprintln!("Esperando pontos");
-                                eprintln!("center: {:?} / ", center.get_data());
                                 while let Some(point) = listen_points.recv().await {
-                                    // eprintln!("recebeu ponto");
                                     points.push(point);
                                 }
                                 send_finish.send(Cluster { center, points }).await.unwrap();
-                                eprintln!("acabou cluster");
                             }
                         });
                         sender_points
@@ -59,7 +54,6 @@ impl Kmeans for KmeansTokioBuilder {
                     .collect::<Vec<mpsc::Sender<&Point>>>()
                     .into();
 
-                // Only threads creating cluster must remain open connections to this channel
                 drop(tx_final_clusters);
 
                 let clusters_arc = Arc::new(clusters);
@@ -69,7 +63,6 @@ impl Kmeans for KmeansTokioBuilder {
                     let clusters_senders = clusters_senders.clone();
                     let clusters = clusters_arc.clone();
                     tokio::task::spawn(async move {
-                        eprintln!("task with ind: {index}");
                         while index < data.len() {
                             let point = data.get(index).unwrap();
 
@@ -89,9 +82,7 @@ impl Kmeans for KmeansTokioBuilder {
                 drop(clusters_senders);
 
                 clusters = Vec::with_capacity(k as usize);
-                eprintln!("Esperando clusters");
                 while let Some(cluster) = rx_final_clusters.recv().await {
-                    eprintln!("cluster {:?}", cluster.center);
                     clusters.push(cluster);
                 }
 

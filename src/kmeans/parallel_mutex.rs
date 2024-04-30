@@ -31,10 +31,12 @@ impl Kmeans for KmeansParallelMutex {
 
         let max_threads = self.max_threads.min(data.len());
 
+
+        let has_finished = Arc::new(Mutex::new(false));
+
         let (tx, rx) = mpsc::channel::<()>();
         let mut tx_init_vec: Vec<mpsc::Sender<()>> = Vec::with_capacity(max_threads);
 
-        let has_finished = Arc::new(Mutex::new(false));
 
         for index_of_thread in 0..max_threads {
             let tx = tx.clone();
@@ -47,6 +49,7 @@ impl Kmeans for KmeansParallelMutex {
             std::thread::spawn(move || {
                 let initial_index = index_of_thread;
                 loop {
+                    // Aguarda o messagem da main para inicio
                     rx_init.recv().unwrap();
 
                     if *has_finished.lock().unwrap() {
@@ -58,21 +61,21 @@ impl Kmeans for KmeansParallelMutex {
                         let point = data.get(index).unwrap();
 
                         let ind_closest_cluster = {
-                            let bind = clusters
+                            let clusters_centers = clusters
                                 .iter()
                                 .map(|lock| lock.read().unwrap().center.clone())
                                 .collect::<Vec<_>>();
-                            get_closest_cluster_index_based_in_centroids(point, bind.iter())
+                            get_closest_cluster_index_based_in_centroids(point, clusters_centers.iter())
                         };
 
-                        let mut target_cluster =
-                            clusters.get(ind_closest_cluster).unwrap().write().unwrap();
-
-                        (*target_cluster).points.push(point);
+                        {
+                            clusters.get(ind_closest_cluster).unwrap().write().unwrap().points.push(point);
+                        }
 
                         index += max_threads;
                     }
 
+                    // Mensagem de encerramento do processamento
                     tx.send(()).unwrap();
                 }
             });
@@ -83,11 +86,16 @@ impl Kmeans for KmeansParallelMutex {
             .for_each(|tx_init| tx_init.send(()).unwrap());
 
         loop {
+
+
             let mut threads_finished = 0;
             while threads_finished < max_threads {
                 rx.recv().unwrap();
                 threads_finished += 1;
             }
+
+
+
 
             let new_centers = {
                 let new_centers: Vec<Point> = {
@@ -114,7 +122,7 @@ impl Kmeans for KmeansParallelMutex {
 
                     return clusters_arc
                         .iter()
-                        .map(|cluster| cluster.read().expect("aq mesmoo").clone())
+                        .map(|cluster| cluster.read().unwrap().clone())
                         .collect();
                 }
 

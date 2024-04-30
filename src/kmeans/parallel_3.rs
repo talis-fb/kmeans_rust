@@ -24,13 +24,11 @@ impl Kmeans for KmeansParallelStdBuilder {
             .map(|center| Cluster::from_center(center))
             .collect::<Vec<Cluster>>();
 
-        eprintln!("initial centers: {:?}", clusters);
 
         // A map based in index to sender points to add in clusters (tasks)
         loop {
             let (tx_final_clusters, rx_final_clusters) = mpsc::channel::<Cluster>();
 
-            // let mut clusters_inputs: Vec<Arc< mpsc::Sender<&Point> >> = Vec::with_capacity(k.into());
             let clusters_senders: Arc<Vec<mpsc::Sender<&Point>>> = clusters
                 .iter()
                 .map(|cluster| {
@@ -40,14 +38,10 @@ impl Kmeans for KmeansParallelStdBuilder {
                         let send_finish = tx_final_clusters.clone();
                         move || {
                             let mut points = Vec::with_capacity(data.len());
-                            eprintln!("Esperando pontos");
-                            eprintln!("center: {:?} / ", center.get_data());
                             while let Ok(point) = listen_points.recv() {
-                                // eprintln!("recebeu ponto");
                                 points.push(point);
                             }
                             send_finish.send(Cluster { center, points }).unwrap();
-                            eprintln!("acabou cluster");
                         }
                     });
                     sender_points
@@ -55,7 +49,6 @@ impl Kmeans for KmeansParallelStdBuilder {
                 .collect::<Vec<mpsc::Sender<&Point>>>()
                 .into();
 
-            // Only threads creating cluster must remain open connections to this channel
             drop(tx_final_clusters);
 
             let clusters_arc = Arc::new(clusters);
@@ -65,7 +58,6 @@ impl Kmeans for KmeansParallelStdBuilder {
                 let clusters_senders = clusters_senders.clone();
                 let clusters = clusters_arc.clone();
                 std::thread::spawn(move || {
-                    eprintln!("task with ind: {index}");
                     while index < data.len() {
                         let point = data.get(index).unwrap();
 
@@ -84,9 +76,7 @@ impl Kmeans for KmeansParallelStdBuilder {
             drop(clusters_senders);
 
             clusters = Vec::with_capacity(k as usize);
-            eprintln!("Esperando clusters");
             while let Ok(cluster) = rx_final_clusters.recv() {
-                eprintln!("cluster {:?}", cluster.center);
                 clusters.push(cluster);
             }
 
