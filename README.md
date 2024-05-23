@@ -1,6 +1,6 @@
 # KMeans Image Segmentation CLI
 
-A Rust-based command-line tool implementing various KMeans clustering algorithms for image segmentation. 
+A Rust-based command-line tool implementing various [KMeans clustering algorithms](https://en.wikipedia.org/wiki/K-means_clustering) for image segmentation. 
 
 It covers multiple implementations of the KMeans algorithm, both serial and parallel. For perfomance comparison and study purposes.
 
