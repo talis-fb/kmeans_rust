@@ -6,6 +6,10 @@ It covers multiple implementations of the KMeans algorithm, both serial and para
 
 This tool is designed to work seamlessly with the [Image to CSV CLI project](https://github.com/talis-fb/img-to-csv). Use the img-to-csv tool to convert an image to CSV, process it with kmeans for segmentation, and convert the result back to an image.
 
+### Java Version Available
+
+For a Java-based implementation of this project, visit the [KMeans Java Repository](https://github.com/talis-fb/kmeans_java).
+
 ## Image Segmentations with Different K Values
 
 To get a concrete example of result of this program...
